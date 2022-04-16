@@ -42,7 +42,7 @@ def deserializeUserMsg(msg):
         msg = "" if len(msgList) == 1 else msgList[1]
         if code == "QUIT":
             msg = CLIENT_NICK
-        elif code == "CHAT" and opt == CLIENT_NICK:
+        elif code == "CHAT" and msg == CLIENT_NICK:
             print(f"{PYCHAT}You cannot chat with yourself. Find another user with !ALL")
             code = False
             msg = ""

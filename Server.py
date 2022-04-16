@@ -51,6 +51,14 @@ def getHelp():
 def getUsers():
     return [ user["name"] for user in USERS ]
 
+def getUser(nick):
+    global USERS
+    print(USERS)
+    userObj = list(filter(lambda U: U["name"] == nick, USERS))
+    if len(userObj) == 0:
+        return False
+    return "|".join(userObj[0].values())
+
 # =============================================================================
 # FUNCTIONS (0) Global functions
 # =============================================================================
@@ -122,7 +130,7 @@ def clientThread(conn, addr):
             if userAdded:
                 sendClientMsg(conn, "START", getHelp())
             else:
-                sendClientMsg(conn, "START", f"Nickname or port already used!{NEW_LINE}")
+                sendClientMsg(conn, "ERR", f"Nickname or port already used!{NEW_LINE}")
         else:
             retry +=1
     print(userAdded, USERS)
@@ -138,14 +146,14 @@ def clientThread(conn, addr):
             opt = f"Users currently connected:{NEW_LINE}" + "\r\n".join(getUsers()) + f"{NEW_LINE}"
         elif code == "CHAT":
             opt = getUser(opt)
-            if not resp:
-                code = "NOK"
-                resp = "User not found! You can find all user with the !ALL command."
+            if not opt:
+                code = "ERR"
+                opt = "User not found! You can find all user with the !ALL command."
         elif code == "QUIT":
             removeUser(opt)
             opt = "Connection closed!"
         else:
-            code = "NOK"
+            code = "ERR"
             opt = "Command not found!"
         
         sendClientMsg(conn, code, opt)
