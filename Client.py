@@ -119,7 +119,7 @@ while True:
         sendServerMsg(serverSkt, code, msg)
 
         serverResp = serverSkt.recv(1024)
-        code, msg = deserializeServerMsg(resp)
+        code, msg = deserializeServerMsg(serverResp)
         
         print("PyChat> " + msg)
 
