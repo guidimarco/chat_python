@@ -40,6 +40,18 @@ COMMANDS = [{
 USERS = []
 
 # =============================================================================
+# FUNCTIONS (0) Getter and setter
+# =============================================================================
+
+def getHelp():
+    return f"Here's the list of all commands:{NEW_LINE}" + "".join(
+        [ comm["name"] + ": " + comm["description"] + NEW_LINE for comm in COMMANDS ]
+    )
+
+def getUsers():
+    return [ user["name"] for user in USERS ]
+
+# =============================================================================
 # FUNCTIONS (0) Global functions
 # =============================================================================
 
@@ -73,11 +85,6 @@ def sendClientMsg(conn, code, opt=None):
             print(f"Failed to send. Error: {er}")
             retry += 1
             time.sleep(1)
-
-def getHelp():
-    return f"Here's the list of all commands:{NEW_LINE*2}" + "".join(
-        [ comm["name"] + ": " + comm["description"] + NEW_LINE for comm in COMMANDS ]
-    ) + f"{NEW_LINE}"
 
 def addUser(nick, IP, PORT):
     for user in USERS:
@@ -115,7 +122,7 @@ def clientThread(conn, addr):
             if userAdded:
                 sendClientMsg(conn, "START", getHelp())
             else:
-                sendClientMsg(conn, "START", f"Nickname or port already used!{NEW_LINE*2}")
+                sendClientMsg(conn, "START", f"Nickname or port already used!{NEW_LINE}")
         else:
             retry +=1
     print(userAdded, USERS)
@@ -128,7 +135,7 @@ def clientThread(conn, addr):
         if code == "HELP":
             opt = getHelp()
         elif code == "ALL":
-            opt = f"Users currently connected:{NEW_LINE*2}" + "\r\n".join(getUsers()) + f"{NEW_LINE}"
+            opt = f"Users currently connected:{NEW_LINE}" + "\r\n".join(getUsers()) + f"{NEW_LINE}"
         elif code == "CHAT":
             opt = getUser(opt)
             if not resp:
@@ -154,7 +161,7 @@ try:
     socketSrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     socketSrv.bind((SERVER_IP, SERVER_PORT))
     socketSrv.listen(10)
-    print(f"The server is on. IP: {SERVER_IP} at port: {SERVER_PORT}{NEW_LINE}")
+    print(f"{NEW_LINE}-----{NEW_LINE}The server is on. IP: {SERVER_IP} at port: {SERVER_PORT}{NEW_LINE}-----{NEW_LINE}")
 except socket.error as er:
     print(f"Failed to create a socket. Error: {er}")
     sys.exit()
