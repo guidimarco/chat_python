@@ -119,20 +119,19 @@ def removeUser(nick):
 def clientThread(conn, addr):
     userAdded = False
     retry = 0
-    while (not userAdded and retry < 5):
+    while not userAdded:
         data = conn.recv(1024)
         code, opt = deserializeClientMsg(data)
-        if code == "START":
-            nick, ip, port = opt.split("|")
 
-            # Overwrite user IP and port with real one
-            userAdded = addUser(nick, addr[0], str(addr[1]))
-            if userAdded:
-                sendClientMsg(conn, "START", getHelp())
-            else:
-                sendClientMsg(conn, "ERR", f"Nickname or port already used!{NEW_LINE}")
+        nick, ip, port = opt.split("|")
+
+        # Overwrite user IP and port with real one
+        userAdded = addUser(nick, addr[0], str(addr[1]))
+        if userAdded:
+            sendClientMsg(conn, "START", getHelp())
         else:
-            retry +=1
+            sendClientMsg(conn, "ERR", f"Nickname or port already used!{NEW_LINE}")
+
     print(userAdded, USERS)
     if not userAdded: return
 
