@@ -28,6 +28,8 @@ CODE_START = "/*"
 CODE_END = "*/"
 COMM_START = "!"
 
+PYCHAT = "PyChat> "
+
 # =============================================================================
 # FUNCTIONS (0) Global functions
 # =============================================================================
@@ -41,7 +43,7 @@ def deserializeUserMsg(msg):
         if code == "QUIT":
             msg = CLIENT_NICK
         elif code == "CHAT" and opt == CLIENT_NICK:
-            print("You cannot chat with yourself. Find another user with !ALL")
+            print(f"{PYCHAT}You cannot chat with yourself. Find another user with !ALL")
             code = False
             msg = ""
     return [code, msg]
@@ -65,7 +67,7 @@ def sendServerMsg(skt, code, opt=None):
             skt.sendall(reply.encode())
             return True
         except socket.error as er:
-            print(f"Failed to send. Error: {er}")
+            print(f"{PYCHAT}Failed to send. Error: {er}")
             retry += 1
             time.sleep(1)
 
@@ -77,11 +79,11 @@ def getUserInfo():
     VALIDATION = False
     while not VALIDATION:
         inputsList = input(
-            "Insert your nickname, IP address and port: "
+            f"{PYCHAT}Insert your nickname, IP address and port: "
         ).split()
 
         if len(inputsList) < 3:
-            print("Enter 3 values")
+            print(f"{PYCHAT}Enter 3 values")
             continue
         global CLIENT_NICK, CLIENT_IP, CLIENT_PORT
         CLIENT_NICK, CLIENT_IP, CLIENT_PORT = [inputsList[i] for i in range(0,3)]
@@ -92,7 +94,7 @@ def checkCredentials(skt):
 
     data = skt.recv(1024)
     code, msg = deserializeServerMsg(data)
-    print(f"{NEW_LINE*2}" + msg)
+    print(f"{NEW_LINE}" + msg)
 
     if code == "ERR":
         return False
@@ -107,7 +109,7 @@ try:
     serverSkt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSkt.connect((SERVER_IP, SERVER_PORT))
 except socket.error as ex:
-    print(f"Failed connecting to the server. Error: {ex}")
+    print(f"{PYCHAT}Failed connecting to the server. Error: {ex}")
     sys.exit()
 
 # =============================================================================
@@ -129,7 +131,7 @@ while True:
         serverResp = serverSkt.recv(1024)
         code, msg = deserializeServerMsg(serverResp)
         
-        print("PyChat> " + msg)
+        print(f"{PYCHAT}{msg}")
 
         if code == "QUIT":
             serverSkt.close()
