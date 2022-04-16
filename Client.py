@@ -74,10 +74,18 @@ def sendServerMsg(skt, code, opt=None):
 # =============================================================================
 
 def getUserInfo():
-    global CLIENT_NICK, CLIENT_IP, CLIENT_PORT
-    CLIENT_NICK, CLIENT_IP, CLIENT_PORT = input(
-        "Insert your nickname, IP address and port: "
-    ).split()
+    VALIDATION = False
+    while not VALIDATION:
+        inputsList = input(
+            "Insert your nickname, IP address and port: "
+        ).split()
+
+        if len(inputsList) < 3:
+            print("Enter 3 values")
+            continue
+        global CLIENT_NICK, CLIENT_IP, CLIENT_PORT
+        CLIENT_NICK, CLIENT_IP, CLIENT_PORT = [inputsList[i] for i in range(0,3)]
+        VALIDATION = True
 
 def checkCredentials(skt):
     sendServerMsg(skt, "START", f"{CLIENT_NICK}|{CLIENT_IP}|{CLIENT_PORT}")
