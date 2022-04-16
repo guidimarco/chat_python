@@ -79,26 +79,6 @@ def getHelp():
         [ comm["name"] + ": " + comm["description"] + NEW_LINE for comm in COMMANDS ]
     ) + f"{NEW_LINE}"
 
-def getUserCredential(conn, addr):
-    userAdded = False
-    retry = 0
-    while (not userAdded or retry < 5):
-        print(conn, type(conn))
-        data = conn.recv(1024)
-        code, opt = deserializeClientMsg(data)
-        if code == "START":
-            nick, ip, port = opt.split("|")
-
-            # Overwrite user IP and port with real one
-            userAdded = addUser(nick, addr[0], str(addr[1]))
-            if userAdded:
-                sendClientMsg(conn, "START", getHelp())
-                return True
-            else:
-                sendClientMsg(conn, "START", f"Nickname or port already used!{NEW_LINE*2}")
-        else:
-            retry +=1
-
 def addUser(nick, IP, PORT):
     for user in USERS:
         if user["name"] == nick or user["port"] == PORT:
@@ -124,7 +104,7 @@ def removeUser(nick):
 def clientThread(conn, addr):
     userAdded = False
     retry = 0
-    while (not userAdded or retry < 5):
+    while (not userAdded and retry < 5):
         data = conn.recv(1024)
         code, opt = deserializeClientMsg(data)
         if code == "START":
@@ -134,42 +114,36 @@ def clientThread(conn, addr):
             userAdded = addUser(nick, addr[0], str(addr[1]))
             if userAdded:
                 sendClientMsg(conn, "START", getHelp())
-                return True
             else:
                 sendClientMsg(conn, "START", f"Nickname or port already used!{NEW_LINE*2}")
         else:
             retry +=1
-    
+    print(userAdded, USERS)
     if not userAdded: return
 
-    print("valid cred")
     while True:
         data = conn.recv(1024)
-        comm, opt = deserializeClientMsg(conn)
-        
-        print(opt)
-        
-        if comm == "HELP":
-            resp = getHelp()
-        elif comm == "ALL":
-            resp = f"Users currently connected:{NEW_LINE*2}" + "\r\n".join(getUsers()) + f"{NEW_LINE}"
-        elif comm == "CHAT":
-            resp = getUser(opt)
-            print(resp)
+        code, opt = deserializeClientMsg(data)
+                
+        if code == "HELP":
+            opt = getHelp()
+        elif code == "ALL":
+            opt = f"Users currently connected:{NEW_LINE*2}" + "\r\n".join(getUsers()) + f"{NEW_LINE}"
+        elif code == "CHAT":
+            opt = getUser(opt)
             if not resp:
                 code = "NOK"
                 resp = "User not found! You can find all user with the !ALL command."
-        elif comm == "QUIT":
+        elif code == "QUIT":
             removeUser(opt)
-            resp = "Connection closed!"
+            opt = "Connection closed!"
         else:
-            comm = "NOK"
-            resp = "Command not found!"
+            code = "NOK"
+            opt = "Command not found!"
         
-        msg = serializeClientMsg(comm, resp)
-        conn.sendall(msg)
+        sendClientMsg(conn, code, opt)
 
-        if comm == "QUIT":
+        if code == "QUIT":
             break
 
 # =============================================================================
