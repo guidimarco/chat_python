@@ -39,8 +39,6 @@ def setChatInfo(info, reset=False):
         CHAT_NICK, CHAT_IP, CHAT_PORT = [None, None, None]
     else:
         CHAT_NICK, CHAT_IP, CHAT_PORT = info.split("|")
-        CHAT_PORT = int(CHAT_PORT)
-        print(type(CHAT_PORT))
 
 # =============================================================================
 # FUNCTIONS (0) Global functions
@@ -150,7 +148,7 @@ except socket.error as ex:
 
 while True:
     msg = input(f"{CLIENT_NICK}> ")
-        
+    
     code, msg = deserializeUserMsg(msg)
     
     if code:
@@ -171,7 +169,6 @@ while True:
             print(f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}")
             sys.exit()
     elif not CHAT_NICK == None:
-        print(msg, msg.encode(), CHAT_IP, CHAT_PORT)
-        clientSkt.sendto(msg.encode(), (CHAT_IP, CHAT_PORT))
+        clientSkt.sendto(msg.encode(), (CHAT_IP, int(CHAT_PORT)))
     else:
         print(f"{PYCHAT}You're not in a chat!")
