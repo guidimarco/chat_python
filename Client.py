@@ -12,12 +12,11 @@ import sys
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 8080
 
-CLIENT_CHECKED = False
+VALID_CRED = False
 CLIENT_NICK = None
 CLIENT_IP = None
 CLIENT_PORT = None
 
-CHAT_SOCKET = None
 CHAT_NICK = None
 CHAT_IP = None
 CHAT_PORT = None
@@ -31,8 +30,22 @@ COMM_START = "!"
 PYCHAT = "PyChat> "
 
 # =============================================================================
+# FUNCTIONS (0) Getter and setter
+# =============================================================================
+
+def setChatInfo(info="", reset=False):
+    global CHAT_NICK, CHAT_IP, CHAT_PORT
+    if reset:
+        CHAT_NICK, CHAT_IP, CHAT_PORT = [None, None, None]
+    else:
+        CHAT_NICK, CHAT_IP, CHAT_PORT = info.split("|")
+
+# =============================================================================
 # FUNCTIONS (0) Global functions
 # =============================================================================
+
+def startNewChat():
+    print("da fare")
 
 def deserializeUserMsg(msg):
     code = False
@@ -76,8 +89,8 @@ def sendServerMsg(skt, code, opt=None):
 # =============================================================================
 
 def getUserInfo():
-    VALIDATION = False
-    while not VALIDATION:
+    global VALID_CRED, CLIENT_NICK
+    while True:
         inputsList = input(
             f"{PYCHAT}Insert your nickname, IP address and port: "
         ).split()
@@ -85,20 +98,21 @@ def getUserInfo():
         if len(inputsList) < 3:
             print(f"{PYCHAT}Enter 3 values")
             continue
-        global CLIENT_NICK, CLIENT_IP, CLIENT_PORT
-        CLIENT_NICK, CLIENT_IP, CLIENT_PORT = [inputsList[i] for i in range(0,3)]
-        VALIDATION = True
+        
+        VALID_CRED = True
+        CLIENT_NICK = inputsList[0]
+        break
 
 def checkCredentials(skt):
+    global CLIENT_NICK, CLIENT_IP, CLIENT_PORT
     sendServerMsg(skt, "START", f"{CLIENT_NICK}|{CLIENT_IP}|{CLIENT_PORT}")
 
     data = skt.recv(1024)
     code, msg = deserializeServerMsg(data)
     print(f"{NEW_LINE}" + msg)
 
-    if code == "ERR":
-        return False
-    return True
+    if not code == "ERR":
+        CLIENT_NICK = CLIENT_NICK
 
 # =============================================================================
 # SCRIPT (0) Connect to server
@@ -108,6 +122,7 @@ print(f"{NEW_LINE}-----{NEW_LINE}Hi! Welcome to PyChat{NEW_LINE}-----{NEW_LINE}"
 try:
     serverSkt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSkt.connect((SERVER_IP, SERVER_PORT))
+    CLIENT_IP, CLIENT_PORT = serverSkt.getsockname()
 except socket.error as ex:
     print(f"{PYCHAT}Failed connecting to the server. Error: {ex}")
     sys.exit()
@@ -116,9 +131,18 @@ except socket.error as ex:
 # SCRIPT (1) Check the user info
 # =============================================================================
 
-while not CLIENT_CHECKED:
+while not VALID_CRED:
     getUserInfo()
-    CLIENT_CHECKED = checkCredentials(serverSkt)
+    checkCredentials(serverSkt)
+
+try:
+    clientSkt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    clientSkt.bind((CLIENT_IP, CLIENT_PORT))
+except socket.error as ex:
+    print(f"{PYCHAT}Failed creating socket UDP. Error: {ex}")
+    serverSkt.close()
+    print(f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}")
+    sys.exit()
 
 while True:
     msg = input(f"{CLIENT_NICK}> ")
@@ -133,9 +157,12 @@ while True:
         
         print(f"{PYCHAT}{msg}")
 
-        if code == "QUIT":
+        if code == "CHAT" and CHAT_NICK == None:
+            setChatInfo(info=msg)
+            startNewChat()
+        elif code == "CHAT":
+            print(f"{PYCHAT}You're already chatting.")
+        elif code == "QUIT":
             serverSkt.close()
             print(f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}")
             sys.exit()
-
-sys.exit()
