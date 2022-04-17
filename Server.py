@@ -118,7 +118,6 @@ def removeUser(nick):
 
 def clientThread(conn, addr):
     userAdded = False
-    retry = 0
     while not userAdded:
         data = conn.recv(1024)
         code, opt = deserializeClientMsg(data)

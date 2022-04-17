@@ -33,19 +33,24 @@ PYCHAT = "PyChat> "
 # FUNCTIONS (0) Getter and setter
 # =============================================================================
 
-def setChatInfo(info="", reset=False):
+def setChatInfo(info, reset=False):
     global CHAT_NICK, CHAT_IP, CHAT_PORT
     if reset:
         CHAT_NICK, CHAT_IP, CHAT_PORT = [None, None, None]
     else:
         CHAT_NICK, CHAT_IP, CHAT_PORT = info.split("|")
+        CHAT_PORT = int(CHAT_PORT)
+        print(type(CHAT_PORT))
 
 # =============================================================================
 # FUNCTIONS (0) Global functions
 # =============================================================================
 
-def startNewChat():
-    print("da fare")
+def startNewChat(opt):
+    global CHAT_NICK, CHAT_IP, CHAT_PORT
+    CHAT_NICK, CHAT_IP, CHAT_PORT = opt.split("|")
+    print(f"{NEW_LINE}-----{NEW_LINE}New chat with {CHAT_NICK}{NEW_LINE}-----{NEW_LINE}")
+
 
 def deserializeUserMsg(msg):
     code = False
@@ -89,7 +94,7 @@ def sendServerMsg(skt, code, opt=None):
 # =============================================================================
 
 def getUserInfo():
-    global VALID_CRED, CLIENT_NICK
+    global CLIENT_NICK
     while True:
         inputsList = input(
             f"{PYCHAT}Insert your nickname, IP address and port: "
@@ -99,12 +104,11 @@ def getUserInfo():
             print(f"{PYCHAT}Enter 3 values")
             continue
         
-        VALID_CRED = True
         CLIENT_NICK = inputsList[0]
         break
 
 def checkCredentials(skt):
-    global CLIENT_NICK, CLIENT_IP, CLIENT_PORT
+    global VALID_CRED, CLIENT_NICK, CLIENT_IP, CLIENT_PORT
     sendServerMsg(skt, "START", f"{CLIENT_NICK}|{CLIENT_IP}|{CLIENT_PORT}")
 
     data = skt.recv(1024)
@@ -112,7 +116,7 @@ def checkCredentials(skt):
     print(f"{NEW_LINE}" + msg)
 
     if not code == "ERR":
-        CLIENT_NICK = CLIENT_NICK
+        VALID_CRED = True
 
 # =============================================================================
 # SCRIPT (0) Connect to server
@@ -159,10 +163,15 @@ while True:
 
         if code == "CHAT" and CHAT_NICK == None:
             setChatInfo(info=msg)
-            startNewChat()
+            startNewChat(msg)
         elif code == "CHAT":
             print(f"{PYCHAT}You're already chatting.")
         elif code == "QUIT":
             serverSkt.close()
             print(f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}")
             sys.exit()
+    elif not CHAT_NICK == None:
+        print(msg, msg.encode(), CHAT_IP, CHAT_PORT)
+        clientSkt.sendto(msg.encode(), (CHAT_IP, CHAT_PORT))
+    else:
+        print(f"{PYCHAT}You're not in a chat!")
