@@ -62,15 +62,18 @@ def getHelp():
 
 def getUsers():
     return f"Users currently connected:{NEW_LINE}" + "".join(
-        [ user["name"] + ": " + user["description"] + NEW_LINE for user in USERS ]
+        [ user["name"] + NEW_LINE for user in USERS ]
     )
 
-def getUser( nick ):
+def getUser( par, value ):
     global USERS
-    userObj = list( filter(lambda U: U["name"] == nick, USERS) )
+    userObj = list( filter(lambda U: U[par] == value, USERS) )
     if len( userObj ) == 0:
         return False
     return "|".join( userObj[0].values() )
+
+def setErr( errMsg="Bad request" ):
+    return [ "ERR", errMsg ]
 
 # =============================================================================
 # FUNCTIONS (0) Global functions
@@ -123,30 +126,33 @@ def removeUser( nick ):
 def clientThread( conn, addr ):
     userOnline = True
     while userOnline:
+        isRegistered = getUser( "port", addr[1] )
         code, opt = recvClientMsg( conn )
                 
-        if code == "START":
-            nick, ip, port = opt.split( "|" )
-            result = addUser( nick, addr[0], str(addr[1]) )
-            opt = getHelp()
-            if not result:
-                code == "ERR"
-                opt == f"Nickname or port already used!{NEW_LINE}"
+        if code == "START" and not isRegistered:
+            optList = opt.split( "|" )
+            if not len( optList ) == 3:
+                code, opt = setErr()
+            else:
+                nick, ip, port = opt.split( "|" )
+                # Overwrite with real IP and port
+                result = addUser( nick, addr[0], str(addr[1]) )
+                opt = getHelp()
+                if not result:
+                    code, opt = setErr( f"Nickname or port already used!{NEW_LINE}" )
         elif code == "HELP":
             opt = getHelp()
         elif code == "ALL":
             opt = getUsers()
         elif code == "CHAT":
-            opt = getUser( opt )
+            opt = getUser( "name", opt )
             if not opt:
-                code = "ERR"
-                opt = "User not found! You can find all user with the !ALL command."
+                code, opt = setErr( "User not found! You can find all user with the !ALL command." )
         elif code == "QUIT":
             removeUser( opt )
             opt = "Connection closed!"
         else:
-            code = "ERR"
-            opt = "Command not found"
+            code, opt = setErr( "Command not found" )
         
         sendClientMsg( conn, code, opt )
 
