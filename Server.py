@@ -1,3 +1,13 @@
+"""
+    SERVER script:
+        1) create a TCP socket
+        2) start the multithread-daemon for client connection
+            Single-thread:
+                - START > Add new user ( nickname, IP, port )
+                - Listen for user command untill
+                - QUIT > Close the thread
+"""
+
 # =============================================================================
 # IMPORT ALL PACKAGES
 # =============================================================================
@@ -20,7 +30,8 @@ NEW_LINE = "\r\n"
 CODE_START = "/*"
 CODE_END = "*/"
 
-COMMANDS = [{
+COMMANDS = [
+    {
         "name": "!HELP",
         "description": "Return the list of all PyChat commands"
     }, {
@@ -35,7 +46,8 @@ COMMANDS = [{
     }, {
         "name": "!QUIT",
         "description": "Close the program"
-}]
+    }
+]
 
 USERS = []
 
@@ -49,40 +61,42 @@ def getHelp():
     )
 
 def getUsers():
-    return [ user["name"] for user in USERS ]
+    return f"Users currently connected:{NEW_LINE}" + "".join(
+        [ comm["name"] + ": " + comm["description"] + NEW_LINE for comm in COMMANDS ]
+    )
 
-def getUser(nick):
+def getUser( nick ):
     global USERS
-    print(USERS)
-    userObj = list(filter(lambda U: U["name"] == nick, USERS))
-    if len(userObj) == 0:
+    print( USERS )
+    userObj = list( filter(lambda U: U["name"] == nick, USERS) )
+    if len( userObj ) == 0:
         return False
-    return "|".join(userObj[0].values())
+    return "|".join( userObj[0].values() )
 
 # =============================================================================
 # FUNCTIONS (0) Global functions
 # =============================================================================
 
-def deserializeClientMsg(data):
+def deserializeClientMsg( data ):
     msg = data.decode()
 
     if not (
         CODE_START not in msg or
-        msg.index(CODE_START) != 0 or
+        msg.index( CODE_START ) != 0 or
         CODE_END not in msg
     ):
-        msgList = msg.split(CODE_END)
+        msgList = msg.split( CODE_END )
         code = msgList[0][2:]
-        opt = None if len(msgList) == 1 else msgList[1]
+        opt = None if len( msgList ) == 1 else msgList[1]
     else:
         code = "ERR"
         opt = "Bad Request"
 
-    return [code, opt]
+    return [ code, opt ]
 
-def sendClientMsg(conn, code, opt=None):
+def sendClientMsg( conn, code, opt=None ):
     # serialize msg
-    reply = str(CODE_START + code + CODE_END + opt)
+    reply = str( CODE_START + code + CODE_END + opt )
     
     retry = 0
     while 0 <= retry < 5:
@@ -94,7 +108,7 @@ def sendClientMsg(conn, code, opt=None):
             retry += 1
             time.sleep(1)
 
-def addUser(nick, IP, PORT):
+def addUser( nick, IP, PORT ):
     for user in USERS:
         if user["name"] == nick or user["port"] == PORT:
             return False
@@ -105,10 +119,10 @@ def addUser(nick, IP, PORT):
     })
     return True
 
-def removeUser(nick):
+def removeUser( nick ):
     for user in USERS:
         if user["name"] == nick:
-            USERS.remove(user)
+            USERS.remove( user )
             return True
     return False
 
@@ -116,68 +130,67 @@ def removeUser(nick):
 # FUNCTIONS (0) Set-up
 # =============================================================================
 
-def clientThread(conn, addr):
+def clientThread( conn, addr ):
     userAdded = False
     while not userAdded:
-        data = conn.recv(1024)
-        code, opt = deserializeClientMsg(data)
+        data = conn.recv( 1024 )
+        code, opt = deserializeClientMsg( data )
 
-        nick, ip, port = opt.split("|")
+        nick, ip, port = opt.split( "|" )
 
         # Overwrite user IP and port with real one
-        userAdded = addUser(nick, addr[0], str(addr[1]))
+        userAdded = addUser( nick, addr[0], str(addr[1]) )
         if userAdded:
-            sendClientMsg(conn, "START", getHelp())
+            sendClientMsg( conn, "START", getHelp() )
         else:
-            sendClientMsg(conn, "ERR", f"Nickname or port already used!{NEW_LINE}")
-
-    print(userAdded, USERS)
-    if not userAdded: return
+            sendClientMsg( conn, "ERR", f"Nickname or port already used!{NEW_LINE}" )
 
     while True:
-        data = conn.recv(1024)
-        code, opt = deserializeClientMsg(data)
+        data = conn.recv( 1024 )
+        code, opt = deserializeClientMsg( data )
                 
         if code == "HELP":
             opt = getHelp()
         elif code == "ALL":
-            opt = f"Users currently connected:{NEW_LINE}" + "\r\n".join(getUsers()) + f"{NEW_LINE}"
+            opt = getUsers()
         elif code == "CHAT":
-            opt = getUser(opt)
+            opt = getUser( opt )
             if not opt:
                 code = "ERR"
                 opt = "User not found! You can find all user with the !ALL command."
         elif code == "QUIT":
-            removeUser(opt)
+            removeUser( opt )
             opt = "Connection closed!"
         else:
             code = "ERR"
             opt = "Command not found!"
         
-        sendClientMsg(conn, code, opt)
+        sendClientMsg( conn, code, opt )
 
         if code == "QUIT":
             break
 
 # =============================================================================
-# SCRIPT (0) Start the server
+# SCRIPT (1) Start the server
 # =============================================================================
 
 try:
-    socketSrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    socketSrv.bind((SERVER_IP, SERVER_PORT))
-    socketSrv.listen(10)
-    print(f"{NEW_LINE}-----{NEW_LINE}The server is on. IP: {SERVER_IP} at port: {SERVER_PORT}{NEW_LINE}-----{NEW_LINE}")
+    socketSrv = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+    socketSrv.bind( (SERVER_IP, SERVER_PORT) )
+    socketSrv.listen( 10 )
+
+    print( f"{NEW_LINE}-----{NEW_LINE}" + 
+        f"The server is on. IP: {SERVER_IP} at port: {SERVER_PORT}" +
+        f"{NEW_LINE}-----{NEW_LINE}" )
 except socket.error as er:
-    print(f"Failed to create a socket. Error: {er}")
+    print( f"Failed to create a socket. Error: {er}" )
     sys.exit()
 
 # =============================================================================
-# SCRIPT (1) Start the daemon
+# SCRIPT (2) Start the daemon
 # =============================================================================
 
 while True:
     conn, addr = socketSrv.accept()
-    print(f"Client connection up. IP: {addr[0]}, port: {addr[1]}")
-    start_new_thread(clientThread, (conn, addr))
-socketSrv.close()
+    print( f"Client connection up. IP: {addr[0]}, port: {addr[1]}" )
+    start_new_thread( clientThread, (conn, addr) )
