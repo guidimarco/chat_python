@@ -62,12 +62,11 @@ def getHelp():
 
 def getUsers():
     return f"Users currently connected:{NEW_LINE}" + "".join(
-        [ comm["name"] + ": " + comm["description"] + NEW_LINE for comm in COMMANDS ]
+        [ user["name"] + ": " + user["description"] + NEW_LINE for user in USERS ]
     )
 
 def getUser( nick ):
     global USERS
-    print( USERS )
     userObj = list( filter(lambda U: U["name"] == nick, USERS) )
     if len( userObj ) == 0:
         return False
@@ -77,7 +76,8 @@ def getUser( nick ):
 # FUNCTIONS (0) Global functions
 # =============================================================================
 
-def deserializeClientMsg( data ):
+def recvClientMsg( conn ):
+    data = conn.recv( 1024 )
     msg = data.decode()
 
     if not (
@@ -90,23 +90,13 @@ def deserializeClientMsg( data ):
         opt = None if len( msgList ) == 1 else msgList[1]
     else:
         code = "ERR"
-        opt = "Bad Request"
+        opt = None
 
     return [ code, opt ]
 
 def sendClientMsg( conn, code, opt=None ):
-    # serialize msg
     reply = str( CODE_START + code + CODE_END + opt )
-    
-    retry = 0
-    while 0 <= retry < 5:
-        try:
-            conn.sendall(reply.encode())
-            return True
-        except socket.error as er:
-            print(f"Failed to send. Error: {er}")
-            retry += 1
-            time.sleep(1)
+    conn.sendall( reply.encode() )
 
 def addUser( nick, IP, PORT ):
     for user in USERS:
@@ -131,25 +121,18 @@ def removeUser( nick ):
 # =============================================================================
 
 def clientThread( conn, addr ):
-    userAdded = False
-    while not userAdded:
-        data = conn.recv( 1024 )
-        code, opt = deserializeClientMsg( data )
-
-        nick, ip, port = opt.split( "|" )
-
-        # Overwrite user IP and port with real one
-        userAdded = addUser( nick, addr[0], str(addr[1]) )
-        if userAdded:
-            sendClientMsg( conn, "START", getHelp() )
-        else:
-            sendClientMsg( conn, "ERR", f"Nickname or port already used!{NEW_LINE}" )
-
-    while True:
-        data = conn.recv( 1024 )
-        code, opt = deserializeClientMsg( data )
+    userOnline = True
+    while userOnline:
+        code, opt = recvClientMsg( conn )
                 
-        if code == "HELP":
+        if code == "START":
+            nick, ip, port = opt.split( "|" )
+            result = addUser( nick, addr[0], str(addr[1]) )
+            opt = getHelp()
+            if not result:
+                code == "ERR"
+                opt == f"Nickname or port already used!{NEW_LINE}"
+        elif code == "HELP":
             opt = getHelp()
         elif code == "ALL":
             opt = getUsers()
@@ -163,12 +146,13 @@ def clientThread( conn, addr ):
             opt = "Connection closed!"
         else:
             code = "ERR"
-            opt = "Command not found!"
+            opt = "Command not found"
         
         sendClientMsg( conn, code, opt )
 
         if code == "QUIT":
-            break
+            userOnline = False
+            conn.close()
 
 # =============================================================================
 # SCRIPT (1) Start the server
