@@ -3,8 +3,6 @@
 # =============================================================================
 
 import socket
-import socketserver
-import threading
 
 import sys
 
@@ -137,11 +135,10 @@ except socket.error as ex:
 while not VALID_CRED:
     getUserInfo()
     checkCredentials( serverSkt )
-    print( CLIENT_IP, CLIENT_PORT )
 
 try:
-    serverSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
-    serverSkt.bind( (CLIENT_IP, CLIENT_PORT) )
+    clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
+    clientSkt.bind( (CLIENT_IP, CLIENT_PORT) )
 except socket.error as ex:
     print( f"{PYCHAT}Failed creating socket UDP. Error: {ex}" )
     serverSkt.close()
@@ -171,6 +168,6 @@ while True:
             print( f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}" )
             sys.exit()
     elif not CHAT_NICK == None:
-        serverSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
+        clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
     else:
         print( f"{PYCHAT}You're not in a chat!" )
