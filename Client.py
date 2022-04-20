@@ -2,8 +2,8 @@
     CLIENT script:
         1) create TCP socket for server connection
         2) set valid credentials ( nickname, IP, port )
-        3) start server thread ( TCP )
-        4) start UDP-server for client-client comm
+        3) start UDP-server for client-client comm
+        4) start server thread ( TCP )
 """
 
 # =============================================================================
@@ -46,7 +46,7 @@ PYCHAT = "PyChat> "
 def setChatInfo( info, reset=False ):
     global CHAT_NICK, CHAT_IP, CHAT_PORT
     if reset:
-        CHAT_NICK, CHAT_IP, CHAT_PORT = [None, None, None]
+        CHAT_NICK, CHAT_IP, CHAT_PORT = [ None, None, None ]
     else:
         CHAT_NICK, CHAT_IP, CHAT_PORT = info.split("|")
 
@@ -91,7 +91,12 @@ def deserializeUserMsg( msg ):
             print( f"{PYCHAT}You cannot chat with yourself. Find another user with !ALL" )
             code = False
             msg = ""
-    return [code, msg]
+        elif code == "END" and CHAT_NICK == None:
+            print( f"{PYCHAT}You're not in a chat!" )
+            code = False
+            msg = ""
+
+    return [ code, msg ]
 
 # =============================================================================
 # PART (1) Connect to server
@@ -110,43 +115,44 @@ except socket.error as ex:
     sys.exit()
 
 # =============================================================================
-# PART (2) Connect to server
+# PART (2) Check user credentials
 # =============================================================================
 
-# Functions
+while NICK == None:
+    inputsList = input(
+        f"{PYCHAT}Insert your nickname, IP address and port: "
+    ).split()
 
-def getUserInfo():
-    global NICK
-    while True:
-        inputsList = input(
-            f"{PYCHAT}Insert your nickname, IP address and port: "
-        ).split()
+    if len( inputsList ) < 3:
+        print( f"{PYCHAT}Enter 3 values" )
+        continue
+    
+    NICK = inputsList[0]
 
-        if len( inputsList ) < 3:
-            print( f"{PYCHAT}Enter 3 values" )
-            continue
-        
-        NICK = inputsList[0]
-        break
+    sendServerMsg( serverSkt, "START", f"{NICK}|{IP}|{PORT}" )
 
-def checkCredentials( skt ):
-    global NICK, IP, PORT
-    sendServerMsg( skt, "START", f"{NICK}|{IP}|{PORT}" )
-
-    code, msg = recvServerMsg( skt )
+    code, msg = recvServerMsg( serverSkt )
     print( f"{NEW_LINE}" + msg )
 
     if code == "ERR":
         NICK = None
 
-# Script
+# =============================================================================
+# PART (3) Start server for client-client communication
+# =============================================================================
 
-while NICK == None:
-    getUserInfo()
-    checkCredentials( serverSkt )
+class ClientRequestHandler( socketserver.BaseRequestHandler ):
+    def setup( self ):
+        print( "bello figo gu")
+
+clientSkt = socketserver.UDPServer( (IP, PORT), ClientRequestHandler )
+
+clientThread = threading.Thread( target=clientSkt.serve_forever )
+clientThread.setDaemon( True )
+clientThread.start()
 
 # =============================================================================
-# PART (3) Start server thread
+# PART (4) Start server thread
 # =============================================================================
 
 # Functions
@@ -158,9 +164,7 @@ def serverThread( serverSkt ):
 
         if code:
             sendServerMsg( serverSkt, code, msg )
-
             code, msg = recvServerMsg( serverSkt )
-            print( f"{PYCHAT}{msg}" )
 
             if code == "CHAT" and CHAT_NICK == None:
                 setChatInfo( info=msg )
@@ -173,28 +177,17 @@ def serverThread( serverSkt ):
                     "PyChat closed" +
                     f"{NEW_LINE}-----{NEW_LINE}" )
                 sys.exit()
-    # elif not CHAT_NICK == None:
-    #     clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
-    # else:
-    #     print( f"{PYCHAT}You're not in a chat!" )
+            else:
+                print( f"{PYCHAT}{msg}" )
 
 # Script
 
 serverThread = threading.Thread( target=serverThread, args=(serverSkt,) )
 serverThread.start()
+
+# =============================================================================
+# PART (5) End all
+# =============================================================================
+
+clientThread.join()
 serverThread.join()
-
-# =============================================================================
-# SCRIPT (1) Check the user info
-# =============================================================================
-
-# clientSkt = socketserver.UDPServer( (CHAT_IP, CHAT_PORT), ChatRequestHandler )
-
-# try:
-#     clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
-#     clientSkt.bind( (IP, PORT) )
-# except socket.error as ex:
-#     print( f"{PYCHAT}Failed creating socket UDP. Error: {ex}" )
-#     serverSkt.close()
-#     print( f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}" )
-#     sys.exit()
