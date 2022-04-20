@@ -1,3 +1,11 @@
+"""
+    CLIENT script:
+        1) create TCP socket for server connection
+        2) set valid credentials ( nickname, IP, port )
+        3) start server thread ( TCP )
+        4) start UDP-server for client-client comm
+"""
+
 # =============================================================================
 # IMPORT ALL PACKAGES
 # =============================================================================
@@ -15,10 +23,9 @@ import sys
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 8080
 
-VALID_CRED = False
-CLIENT_NICK = None
-CLIENT_IP = None
-CLIENT_PORT = None
+NICK = None
+IP = None
+PORT = None
 
 CHAT_NICK = None
 CHAT_IP = None
@@ -47,6 +54,21 @@ def setChatInfo( info, reset=False ):
 # FUNCTIONS (0) Global functions
 # =============================================================================
 
+def recvServerMsg( serverSkt ):
+    data = serverSkt.recv( 1024 )
+    msg = data.decode()
+
+    msgList = msg.split( CODE_END )
+    code = msgList[0][2:]
+    opt = None if len( msgList ) == 1 else msgList[1]
+
+    return [ code, opt ]
+
+def sendServerMsg( skt, code, opt=None ):
+    reply = str( CODE_START + code + CODE_END + opt )
+    
+    skt.sendall( reply.encode() )
+
 def startNewChat( opt ):
     global CHAT_NICK, CHAT_IP, CHAT_PORT
     CHAT_NICK, CHAT_IP, CHAT_PORT = opt.split( "|" )
@@ -64,58 +86,15 @@ def deserializeUserMsg( msg ):
         msg = "" if len( msgList ) == 1 else msgList[1]
 
         if code == "QUIT":
-            msg = CLIENT_NICK
-        elif code == "CHAT" and msg == CLIENT_NICK:
+            msg = NICK
+        elif code == "CHAT" and msg == NICK:
             print( f"{PYCHAT}You cannot chat with yourself. Find another user with !ALL" )
             code = False
             msg = ""
     return [code, msg]
 
-def deserializeServerMsg( data ):
-    msg = data.decode()
-
-    msgList = msg.split( CODE_END )
-    code = msgList[0][2:]
-    opt = None if len( msgList ) == 1 else msgList[1]
-
-    return [code, opt]
-
-def sendServerMsg( skt, code, opt=None ):
-    reply = str( CODE_START + code + CODE_END + opt )
-    
-    skt.sendall( reply.encode() )
-
 # =============================================================================
-# FUNCTIONS (1) Connection to the server
-# =============================================================================
-
-def getUserInfo():
-    global CLIENT_NICK
-    while True:
-        inputsList = input(
-            f"{PYCHAT}Insert your nickname, IP address and port: "
-        ).split()
-
-        if len( inputsList ) < 3:
-            print( f"{PYCHAT}Enter 3 values" )
-            continue
-        
-        CLIENT_NICK = inputsList[0]
-        break
-
-def checkCredentials( skt ):
-    global VALID_CRED, CLIENT_NICK, CLIENT_IP, CLIENT_PORT
-    sendServerMsg( skt, "START", f"{CLIENT_NICK}|{CLIENT_IP}|{CLIENT_PORT}" )
-
-    data = skt.recv( 1024 )
-    code, msg = deserializeServerMsg( data )
-    print( f"{NEW_LINE}" + msg )
-
-    if not code == "ERR":
-        VALID_CRED = True
-
-# =============================================================================
-# SCRIPT (0) Connect to server
+# PART (1) Connect to server
 # =============================================================================
 
 print( f"{NEW_LINE}-----{NEW_LINE}" +
@@ -125,51 +104,97 @@ print( f"{NEW_LINE}-----{NEW_LINE}" +
 try:
     serverSkt = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
     serverSkt.connect( (SERVER_IP, SERVER_PORT) )
-    CLIENT_IP, CLIENT_PORT = serverSkt.getsockname()
+    IP, PORT = serverSkt.getsockname()
 except socket.error as ex:
     print( f"{PYCHAT}Failed connecting to the server. Error: {ex}" )
     sys.exit()
 
 # =============================================================================
-# SCRIPT (1) Check the user info
+# PART (2) Connect to server
 # =============================================================================
 
-while not VALID_CRED:
+# Functions
+
+def getUserInfo():
+    global NICK
+    while True:
+        inputsList = input(
+            f"{PYCHAT}Insert your nickname, IP address and port: "
+        ).split()
+
+        if len( inputsList ) < 3:
+            print( f"{PYCHAT}Enter 3 values" )
+            continue
+        
+        NICK = inputsList[0]
+        break
+
+def checkCredentials( skt ):
+    global NICK, IP, PORT
+    sendServerMsg( skt, "START", f"{NICK}|{IP}|{PORT}" )
+
+    code, msg = recvServerMsg( skt )
+    print( f"{NEW_LINE}" + msg )
+
+    if code == "ERR":
+        NICK = None
+
+# Script
+
+while NICK == None:
     getUserInfo()
     checkCredentials( serverSkt )
 
-try:
-    clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
-    clientSkt.bind( (CLIENT_IP, CLIENT_PORT) )
-except socket.error as ex:
-    print( f"{PYCHAT}Failed creating socket UDP. Error: {ex}" )
-    serverSkt.close()
-    print( f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}" )
-    sys.exit()
+# =============================================================================
+# PART (3) Start server thread
+# =============================================================================
 
-while True:
-    msg = input( f"{CLIENT_NICK}> " )
-    
-    code, msg = deserializeUserMsg( msg )
-    
-    if code:
-        sendServerMsg( serverSkt, code, msg )
+# Functions
 
-        serverResp = serverSkt.recv( 1024 )
-        code, msg = deserializeServerMsg( serverResp )
-        
-        print( f"{PYCHAT}{msg}" )
+def serverThread( serverSkt ):
+    while True:
+        msg = input( f"{NICK}> " )
+        code, msg = deserializeUserMsg( msg )
 
-        if code == "CHAT" and CHAT_NICK == None:
-            setChatInfo( info=msg )
-            startNewChat( msg )
-        elif code == "CHAT":
-            print( f"{PYCHAT}You're already chatting." )
-        elif code == "QUIT":
-            serverSkt.close()
-            print( f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}" )
-            sys.exit()
-    elif not CHAT_NICK == None:
-        clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
-    else:
-        print( f"{PYCHAT}You're not in a chat!" )
+        if code:
+            sendServerMsg( serverSkt, code, msg )
+
+            code, msg = recvServerMsg( serverSkt )
+            print( f"{PYCHAT}{msg}" )
+
+            if code == "CHAT" and CHAT_NICK == None:
+                setChatInfo( info=msg )
+                startNewChat( msg )
+            elif code == "CHAT":
+                print( f"{PYCHAT}You're already chatting." )
+            elif code == "QUIT":
+                serverSkt.close()
+                print( f"{NEW_LINE}-----{NEW_LINE}" +
+                    "PyChat closed" +
+                    f"{NEW_LINE}-----{NEW_LINE}" )
+                sys.exit()
+    # elif not CHAT_NICK == None:
+    #     clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
+    # else:
+    #     print( f"{PYCHAT}You're not in a chat!" )
+
+# Script
+
+serverThread = threading.Thread( target=serverThread, args=(serverSkt,) )
+serverThread.start()
+serverThread.join()
+
+# =============================================================================
+# SCRIPT (1) Check the user info
+# =============================================================================
+
+# clientSkt = socketserver.UDPServer( (CHAT_IP, CHAT_PORT), ChatRequestHandler )
+
+# try:
+#     clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
+#     clientSkt.bind( (IP, PORT) )
+# except socket.error as ex:
+#     print( f"{PYCHAT}Failed creating socket UDP. Error: {ex}" )
+#     serverSkt.close()
+#     print( f"{NEW_LINE}-----{NEW_LINE}PyChat closed{NEW_LINE}-----{NEW_LINE}" )
+#     sys.exit()
