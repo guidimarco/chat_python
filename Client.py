@@ -44,15 +44,16 @@ NICK_END = ">"
 # FUNCTIONS (0) Getter and setter
 # =============================================================================
 
-def getChatNickname( msg ):
+def deserializeChatMsg( msg ):
     nick = False
     if ( NICK_END in msg and
         msg.index( NICK_END ) != 0 ):
         msgList = msg.split( NICK_END )
         nick = msgList[0]
-    return nick
+        msg = msgList[1]
+    return [ nick, msg ]
 
-def setChatInfo( info, reset=False ):
+def setChatInfo( info="", reset=False ):
     global CHAT_NICK, CHAT_IP, CHAT_PORT
     if reset:
         CHAT_NICK, CHAT_IP, CHAT_PORT = [ None, None, None ]
@@ -76,6 +77,10 @@ def recvServerMsg( serverSkt ):
     opt = None if len( msgList ) == 1 else msgList[1]
 
     return [ code, opt ]
+
+def sendChatMsg( clientSkt, msg ):
+    msg = f"{NICK + NICK_END}" + msg
+    clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
 
 def sendServerMsg( skt, code, opt=None ):
     reply = str( CODE_START + code + CODE_END + opt )
@@ -149,21 +154,17 @@ while NICK == None:
 def clientThread( clientSkt ):
     while True:
         data, addr = clientSkt.recvfrom( 1024 )
-        print( data, addr )
         if ( CHAT_NICK != None and
-            addr != (CHAT_IP, CHAT_PORT) ):
-            print("fucj")
-            clientSkt.sendto( f"{NICK}> I cannot chat", addr )
-            continue
-        
-        msg = data.decode()
-        nick = getChatNickname( msg )
-        if nick:
-            if CHAT_NICK == None:
-                # I should check the user cred with the server
-                chatInfo = nick + "|" + addr[0] + "|" + str( addr[1] )
-                setChatInfo( info=chatInfo )
-            print( f"{NEW_LINE + CHAT_NICK + msg}" )
+            addr[0] != CHAT_IP and
+            addr[1] != CHAT_PORT ):
+            sendChatMsg( clientSkt, "I'm already in a chat!" )
+
+        nick, msg = deserializeChatMsg( data.decode() )
+        if CHAT_NICK == None:
+            # I should check the user cred with the server
+            chatInfo = nick + "|" + addr[0] + "|" + str( addr[1] )
+            setChatInfo( info=chatInfo )
+        print( f"{NEW_LINE + CHAT_NICK + NICK_END}" + " " + f"{msg}" )
 
 
 clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
@@ -183,7 +184,14 @@ def serverThread( serverSkt, clientSkt ):
         msg = input( f"{NICK}> " )
         code, msg = deserializeUserMsg( msg )
 
-        if code:
+        if code == "END" and CHAT_NICK != None:
+            print( f"{NEW_LINE}-----{NEW_LINE}" +
+                f"End chat with {CHAT_NICK}" +
+                f"{NEW_LINE}-----{NEW_LINE}" )
+            setChatInfo( reset=True )
+        elif code == "END":
+            print(f"{PYCHAT + NICK_END}You're not in a chat.")
+        elif code:
             sendServerMsg( serverSkt, code, msg )
             code, msg = recvServerMsg( serverSkt )
 
@@ -201,8 +209,7 @@ def serverThread( serverSkt, clientSkt ):
                 print( f"{PYCHAT + NICK_END}{msg}" )
         elif ( CHAT_NICK != None and
             msg != "" ):
-            print(msg)
-            clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
+            sendChatMsg( clientSkt, msg )
     
 
 # Script
