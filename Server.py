@@ -67,7 +67,7 @@ def getUsers():
 
 def getUser( par, value ):
     global USERS
-    userObj = list( filter(lambda U: U[par] == str( value ), USERS) )
+    userObj = list( filter(lambda U: U[par] == value, USERS) )
     if len( userObj ) == 0:
         return False
     return "|".join( userObj[0].values() )
@@ -80,11 +80,7 @@ def setErr( errMsg="Bad request" ):
 # =============================================================================
 
 def recvClientMsg( conn ):
-    try:
-        data = conn.recv( 1024 )
-    except:
-        conn.close()
-        return [ False, None ]
+    data = conn.recv( 1024 )
     msg = data.decode()
 
     if not (
@@ -128,11 +124,12 @@ def removeUser( nick ):
 # =============================================================================
 
 def clientThread( conn, addr ):
-    while True:
-        userInfo = getUser( "port", addr[1] )
+    userOnline = True
+    while userOnline:
+        isRegistered = getUser( "port", addr[1] )
         code, opt = recvClientMsg( conn )
-
-        if code == "START" and not userInfo:
+                
+        if code == "START" and not isRegistered:
             optList = opt.split( "|" )
             if not len( optList ) == 3:
                 code, opt = setErr()
@@ -151,16 +148,19 @@ def clientThread( conn, addr ):
             opt = getUser( "name", opt )
             if not opt:
                 code, opt = setErr( "User not found! You can find all user with the !ALL command." )
-        elif code == "QUIT" or code == False:
-            nick, IP, port = userInfo.split("|")
+        elif code == "QUIT":
+            nick, IP, port = getUser( "name", opt ).split("|")
             print( f"Client connection down. IP: {IP}, port: {port}" )
             removeUser( nick )
-            conn.close()
-            break
+            opt = "Connection closed!"
         else:
             code, opt = setErr( "Command not found" )
         
         sendClientMsg( conn, code, opt )
+
+        if code == "QUIT":
+            userOnline = False
+            conn.close()
 
 # =============================================================================
 # SCRIPT (1) Start the server
