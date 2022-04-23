@@ -124,6 +124,11 @@ except socket.error as ex:
 # =============================================================================
 
 while NICK == None:
+    """
+        Check user credentials
+        -----
+        Ask for nickname, IP and port untill the user choose free credentials.
+    """
     inputsList = input(
         f"{PYCHAT + NICK_END} Insert your nickname, IP address and port: "
     ).split()
@@ -147,6 +152,15 @@ while NICK == None:
 # =============================================================================
 
 def clientThread( clientSkt ):
+    """
+        Client-client thread ( UDP socket )
+        -----
+        This thread listen and process client msg.
+        1) Receive client msg
+        2) Check sender ( when the chat is on )
+        3) Start a new chat ( when the chat is off )
+        4) Print message on the screen
+    """
     while True:
         try:
             data, addr = clientSkt.recvfrom( 1024 )
@@ -156,14 +170,16 @@ def clientThread( clientSkt ):
         
         if ( CHAT_NICK != None and
             str(addr[1]) != CHAT_PORT ):
+            # 2) Check sender
             clientSkt.sendto( b"I'm already in a chat!", (addr[0], addr[1]) )
             continue
-
         nick, msg = deserializeChatMsg( data.decode() )
+
         if CHAT_NICK == None:
-            # I should check the user cred with the server
+            # 3) Start a new chat
             chatInfo = nick + "|" + addr[0] + "|" + str( addr[1] )
             setChatInfo( info=chatInfo )
+        
         print( f"{NEW_LINE + CHAT_NICK + NICK_END}" + " " + f"{msg}" )
 
 clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
@@ -177,6 +193,16 @@ clientThread.start()
 # =============================================================================
 
 def serverThread( serverSkt, clientSkt ):
+    """
+        Client-server thread ( TCP socket )
+        -----
+        This thread listen and process user msg.
+        1) Get and serialize user msg
+        2) Process user msg. The msg could have different receiver:
+            a) Server > if contain a code 
+            b) Client > a chat is on
+            c) No-one > otherwise 
+    """
     while True:
         msg = input( f"{NICK}> " )
         code, msg = deserializeUserMsg( msg )
