@@ -155,9 +155,9 @@ def clientThread( clientSkt ):
     while True:
         data, addr = clientSkt.recvfrom( 1024 )
         if ( CHAT_NICK != None and
-            addr[0] != CHAT_IP and
-            addr[1] != CHAT_PORT ):
-            sendChatMsg( clientSkt, "I'm already in a chat!" )
+            str(addr[1]) != CHAT_PORT ):
+            clientSkt.sendto( b"I'm already in a chat!", (addr[0], addr[1]) )
+            continue
 
         nick, msg = deserializeChatMsg( data.decode() )
         if CHAT_NICK == None:
@@ -210,7 +210,6 @@ def serverThread( serverSkt, clientSkt ):
         elif ( CHAT_NICK != None and
             msg != "" ):
             sendChatMsg( clientSkt, msg )
-    
 
 # Script
 
