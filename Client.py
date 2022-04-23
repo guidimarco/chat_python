@@ -98,11 +98,11 @@ def deserializeUserMsg( msg ):
         if code == "QUIT":
             msg = NICK
         elif code == "CHAT" and msg == NICK:
-            print( f"{PYCHAT + NICK_END}You cannot chat with yourself. Find another user with !ALL" )
+            print( f"{PYCHAT + NICK_END} You cannot chat with yourself. Find another user with !ALL" )
             code = False
             msg = ""
         elif code == "END" and CHAT_NICK == None:
-            print( f"{PYCHAT + NICK_END}You're not in a chat!" )
+            print( f"{PYCHAT + NICK_END} You're not in a chat!" )
             code = False
             msg = ""
 
@@ -121,7 +121,7 @@ try:
     serverSkt.connect( (SERVER_IP, SERVER_PORT) )
     IP, PORT = serverSkt.getsockname()
 except socket.error as ex:
-    print( f"{PYCHAT + NICK_END}Failed connecting to the server. Error: {ex}" )
+    print( f"{PYCHAT + NICK_END} Failed connecting to the server. Error: {ex}" )
     sys.exit()
 
 # =============================================================================
@@ -130,11 +130,11 @@ except socket.error as ex:
 
 while NICK == None:
     inputsList = input(
-        f"{PYCHAT + NICK_END}Insert your nickname, IP address and port: "
+        f"{PYCHAT + NICK_END} Insert your nickname, IP address and port: "
     ).split()
 
     if len( inputsList ) < 3:
-        print( f"{PYCHAT + NICK_END}Enter 3 values" )
+        print( f"{PYCHAT + NICK_END} Enter 3 values" )
         continue
     
     NICK = inputsList[0]
@@ -192,7 +192,7 @@ def serverThread( serverSkt, clientSkt ):
                 f"{NEW_LINE}-----{NEW_LINE}" )
             setChatInfo( reset=True )
         elif code == "END":
-            print(f"{PYCHAT + NICK_END}You're not in a chat.")
+            print(f"{PYCHAT + NICK_END} You're not in a chat.")
         elif code:
             sendServerMsg( serverSkt, code, msg )
             code, msg = recvServerMsg( serverSkt )
@@ -200,7 +200,7 @@ def serverThread( serverSkt, clientSkt ):
             if code == "CHAT" and CHAT_NICK == None:
                 setChatInfo( info=msg )
             elif code == "CHAT":
-                print( f"{PYCHAT + NICK_END}You're already chatting." )
+                print( f"{PYCHAT + NICK_END} You're already chatting." )
             elif code == "QUIT":
                 print( f"{NEW_LINE}-----{NEW_LINE}" +
                     "PyChat closed" +
@@ -209,7 +209,7 @@ def serverThread( serverSkt, clientSkt ):
                 clientSkt.close()
                 sys.exit()
             else:
-                print( f"{PYCHAT + NICK_END}{msg}" )
+                print( f"{PYCHAT + NICK_END}" + " " + f"{msg}" )
         elif ( CHAT_NICK != None and
             msg != "" ):
             sendChatMsg( clientSkt, msg )
