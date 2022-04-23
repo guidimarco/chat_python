@@ -1,9 +1,10 @@
 """
     CLIENT script:
-        1) create TCP socket for server connection
-        2) set valid credentials ( nickname, IP, port )
-        3) start UDP-server for client-client comm
-        4) start server thread ( TCP )
+        1) Connect to server: create TCP socket for server connection
+        2) Check user credentials: set valid credentials ( nickname, IP, port )
+        3) Start server for client-client communication:
+            start UDP-server for client-client comm
+        4) Start server thread: TCP thread
 """
 
 # =============================================================================
@@ -11,7 +12,6 @@
 # =============================================================================
 
 import socket
-import socketserver
 import threading
 
 import sys
@@ -32,26 +32,15 @@ CHAT_IP = None
 CHAT_PORT = None
 
 NEW_LINE = "\r\n"
-
 CODE_START = "/*"
 CODE_END = "*/"
 COMM_START = "!"
-
 PYCHAT = "PyChat"
 NICK_END = ">"
 
 # =============================================================================
 # FUNCTIONS (0) Getter and setter
 # =============================================================================
-
-def deserializeChatMsg( msg ):
-    nick = False
-    if ( NICK_END in msg and
-        msg.index( NICK_END ) != 0 ):
-        msgList = msg.split( NICK_END )
-        nick = msgList[0]
-        msg = msgList[1]
-    return [ nick, msg ]
 
 def setChatInfo( info="", reset=False ):
     global CHAT_NICK, CHAT_IP, CHAT_PORT
@@ -78,15 +67,10 @@ def recvServerMsg( serverSkt ):
 
     return [ code, opt ]
 
-def sendChatMsg( clientSkt, msg ):
-    msg = f"{NICK + NICK_END}" + msg
-    clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
-
 def sendServerMsg( skt, code, opt=None ):
     reply = str( CODE_START + code + CODE_END + opt )
     
     skt.sendall( reply.encode() )
-
 
 def deserializeUserMsg( msg ):
     code = False
@@ -107,6 +91,15 @@ def deserializeUserMsg( msg ):
             msg = ""
 
     return [ code, msg ]
+
+def deserializeChatMsg( msg ):
+    nick = False
+    if ( NICK_END in msg and
+        msg.index( NICK_END ) != 0 ):
+        msgList = msg.split( NICK_END )
+        nick = msgList[0]
+        msg = msgList[1]
+    return [ nick, msg ]
 
 # =============================================================================
 # PART (1) Connect to server
@@ -156,7 +149,9 @@ def clientThread( clientSkt ):
         try:
             data, addr = clientSkt.recvfrom( 1024 )
         except:
-            sys.exit()
+            setChatInfo( reset=True )
+            continue
+        
         if ( CHAT_NICK != None and
             str(addr[1]) != CHAT_PORT ):
             clientSkt.sendto( b"I'm already in a chat!", (addr[0], addr[1]) )
@@ -178,8 +173,6 @@ clientThread.start()
 # =============================================================================
 # PART (4) Start server thread
 # =============================================================================
-
-# Functions
 
 def serverThread( serverSkt, clientSkt ):
     while True:
@@ -212,13 +205,8 @@ def serverThread( serverSkt, clientSkt ):
                 print( f"{PYCHAT + NICK_END}" + " " + f"{msg}" )
         elif ( CHAT_NICK != None and
             msg != "" ):
-            sendChatMsg( clientSkt, msg )
-
-# Script
+            msg = f"{NICK + NICK_END}" + msg
+            clientSkt.sendto( msg.encode(), (CHAT_IP, int(CHAT_PORT)) )
 
 serverThread = threading.Thread( target=serverThread, args=(serverSkt, clientSkt) )
 serverThread.start()
-
-# =============================================================================
-# PART (5) End all
-# =============================================================================
