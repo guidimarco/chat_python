@@ -48,9 +48,9 @@ def setChatInfo( info="", reset=False ):
         CHAT_NICK, CHAT_IP, CHAT_PORT = [ None, None, None ]
     else:
         CHAT_NICK, CHAT_IP, CHAT_PORT = info.split("|")
-        print( f"{NEW_LINE}-----{NEW_LINE}" +
+        print( f"{NEW_LINE}*****{NEW_LINE}" +
             f"New chat with {CHAT_NICK}" +
-            f"{NEW_LINE}-----{NEW_LINE}" )
+            f"{NEW_LINE}*****{NEW_LINE}" )
 
 # =============================================================================
 # FUNCTIONS (0) Global functions
@@ -171,7 +171,7 @@ def clientThread( clientSkt ):
         if ( CHAT_NICK != None and
             str(addr[1]) != CHAT_PORT ):
             # 2) Check sender
-            clientSkt.sendto( b"I'm already in a chat!", (addr[0], addr[1]) )
+            clientSkt.sendto( f"I'm already in a chat!".encode(), (addr[0], addr[1]) )
             continue
         nick, msg = deserializeChatMsg( data.decode() )
 
@@ -180,7 +180,7 @@ def clientThread( clientSkt ):
             chatInfo = nick + "|" + addr[0] + "|" + str( addr[1] )
             setChatInfo( info=chatInfo )
         
-        print( f"{NEW_LINE + CHAT_NICK + NICK_END}" + " " + f"{msg}" )
+        print( f"{CHAT_NICK + NICK_END}" + " " + f"{msg}" )
 
 clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
 clientSkt.bind( (IP, PORT) )
@@ -204,13 +204,14 @@ def serverThread( serverSkt, clientSkt ):
             c) No-one > otherwise 
     """
     while True:
-        msg = input( f"{NICK}> " )
+        inputMsg = f"Write to {PYCHAT}...{NEW_LINE}" if CHAT_NICK == None else f"Write to {CHAT_NICK}...{NEW_LINE}"
+        msg = input( inputMsg )
         code, msg = deserializeUserMsg( msg )
 
         if code == "END" and CHAT_NICK != None:
-            print( f"{NEW_LINE}-----{NEW_LINE}" +
+            print( f"{NEW_LINE}*****{NEW_LINE}" +
                 f"End chat with {CHAT_NICK}" +
-                f"{NEW_LINE}-----{NEW_LINE}" )
+                f"{NEW_LINE}*****{NEW_LINE}" )
             setChatInfo( reset=True )
         elif code == "END":
             print(f"{PYCHAT + NICK_END} You're not in a chat.")
