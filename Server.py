@@ -67,7 +67,7 @@ def getUsers():
 
 def getUser( par, value ):
     global USERS
-    userObj = list( filter(lambda U: U[par] == value, USERS) )
+    userObj = list( filter(lambda U: U[par] == str( value ), USERS) )
     if len( userObj ) == 0:
         return False
     return "|".join( userObj[0].values() )
@@ -80,7 +80,11 @@ def setErr( errMsg="Bad request" ):
 # =============================================================================
 
 def recvClientMsg( conn ):
-    data = conn.recv( 1024 )
+    try:
+        data = conn.recv( 1024 )
+    except:
+        conn.close()
+        return [ False, None ]
     msg = data.decode()
 
     if not (
@@ -124,12 +128,11 @@ def removeUser( nick ):
 # =============================================================================
 
 def clientThread( conn, addr ):
-    userOnline = True
-    while userOnline:
-        isRegistered = getUser( "port", addr[1] )
+    while True:
+        userInfo = getUser( "port", addr[1] )
         code, opt = recvClientMsg( conn )
-                
-        if code == "START" and not isRegistered:
+
+        if code == "START" and not userInfo:
             optList = opt.split( "|" )
             if not len( optList ) == 3:
                 code, opt = setErr()
@@ -148,19 +151,21 @@ def clientThread( conn, addr ):
             opt = getUser( "name", opt )
             if not opt:
                 code, opt = setErr( "User not found! You can find all user with the !ALL command." )
-        elif code == "QUIT":
-            nick, IP, port = getUser( "name", opt ).split("|")
+        elif code == "QUIT" or code == False:
+            nick, IP, port = userInfo.split("|")
             print( f"Client connection down. IP: {IP}, port: {port}" )
             removeUser( nick )
-            opt = "Connection closed!"
+            conn.close()
         else:
             code, opt = setErr( "Command not found" )
         
-        sendClientMsg( conn, code, opt )
+        if code:
+            sendClientMsg( conn, code, opt )
 
         if code == "QUIT":
-            userOnline = False
             conn.close()
+            break
+
 
 # =============================================================================
 # SCRIPT (1) Start the server
