@@ -153,7 +153,10 @@ while NICK == None:
 
 def clientThread( clientSkt ):
     while True:
-        data, addr = clientSkt.recvfrom( 1024 )
+        try:
+            data, addr = clientSkt.recvfrom( 1024 )
+        except:
+            sys.exit()
         if ( CHAT_NICK != None and
             str(addr[1]) != CHAT_PORT ):
             clientSkt.sendto( b"I'm already in a chat!", (addr[0], addr[1]) )
@@ -165,7 +168,6 @@ def clientThread( clientSkt ):
             chatInfo = nick + "|" + addr[0] + "|" + str( addr[1] )
             setChatInfo( info=chatInfo )
         print( f"{NEW_LINE + CHAT_NICK + NICK_END}" + " " + f"{msg}" )
-
 
 clientSkt = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
 clientSkt.bind( (IP, PORT) )
@@ -200,10 +202,11 @@ def serverThread( serverSkt, clientSkt ):
             elif code == "CHAT":
                 print( f"{PYCHAT + NICK_END}You're already chatting." )
             elif code == "QUIT":
-                serverSkt.close()
                 print( f"{NEW_LINE}-----{NEW_LINE}" +
                     "PyChat closed" +
                     f"{NEW_LINE}-----{NEW_LINE}" )
+                serverSkt.close()
+                clientSkt.close()
                 sys.exit()
             else:
                 print( f"{PYCHAT + NICK_END}{msg}" )
