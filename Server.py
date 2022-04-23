@@ -1,11 +1,11 @@
 """
     SERVER script:
-        1) create a TCP socket
-        2) start the multithread-daemon for client connection
-            Single-thread:
-                - START > Add new user ( nickname, IP, port )
-                - Listen for user command untill
-                - QUIT > Close the thread
+        1) Start the server: create a TCP socket
+        2) Start the daemon: multithread-daemon for client connection
+            > Single-thread:
+                1) START > Add new user ( nickname, IP, port )
+                2) Listen for user command untill
+                3) QUIT > Close the thread
 """
 
 # =============================================================================
@@ -15,7 +15,6 @@
 import socket
 from _thread import *
 
-import time
 import sys
 
 # =============================================================================
@@ -26,10 +25,10 @@ SERVER_IP = "127.0.0.1"
 SERVER_PORT = 8080
 
 NEW_LINE = "\r\n"
-
 CODE_START = "/*"
 CODE_END = "*/"
 
+USERS = []
 COMMANDS = [
     {
         "name": "!HELP",
@@ -48,8 +47,6 @@ COMMANDS = [
         "description": "Close the program"
     }
 ]
-
-USERS = []
 
 # =============================================================================
 # FUNCTIONS (0) Getter and setter
@@ -83,10 +80,14 @@ def recvClientMsg( conn ):
     try:
         data = conn.recv( 1024 )
     except:
+        # close the connection in case of error
+        # or if client close without QUIT
         conn.close()
         return [ False, None ]
+
     msg = data.decode()
 
+    # validate and serialize client-msg
     if not (
         CODE_START not in msg or
         msg.index( CODE_START ) != 0 or
@@ -102,6 +103,7 @@ def recvClientMsg( conn ):
     return [ code, opt ]
 
 def sendClientMsg( conn, code, opt=None ):
+    # serialize msg and send-it
     reply = str( CODE_START + code + CODE_END + opt )
     conn.sendall( reply.encode() )
 
@@ -124,50 +126,6 @@ def removeUser( nick ):
     return False
 
 # =============================================================================
-# FUNCTIONS (0) Set-up
-# =============================================================================
-
-def clientThread( conn, addr ):
-    while True:
-        userInfo = getUser( "port", addr[1] )
-        code, opt = recvClientMsg( conn )
-
-        if code == "START" and not userInfo:
-            optList = opt.split( "|" )
-            if not len( optList ) == 3:
-                code, opt = setErr()
-            else:
-                nick, ip, port = opt.split( "|" )
-                # Overwrite with real IP and port
-                result = addUser( nick, addr[0], str(addr[1]) )
-                opt = getHelp()
-                if not result:
-                    code, opt = setErr( f"Nickname or port already used!{NEW_LINE}" )
-        elif code == "HELP":
-            opt = getHelp()
-        elif code == "ALL":
-            opt = getUsers()
-        elif code == "CHAT":
-            opt = getUser( "name", opt )
-            if not opt:
-                code, opt = setErr( "User not found! You can find all user with the !ALL command." )
-        elif code == "QUIT" or code == False:
-            nick, IP, port = userInfo.split("|")
-            print( f"Client connection down. IP: {IP}, port: {port}" )
-            removeUser( nick )
-            conn.close()
-        else:
-            code, opt = setErr( "Command not found" )
-        
-        if code:
-            sendClientMsg( conn, code, opt )
-
-        if code == "QUIT":
-            conn.close()
-            break
-
-
-# =============================================================================
 # SCRIPT (1) Start the server
 # =============================================================================
 
@@ -186,6 +144,63 @@ except socket.error as er:
 # =============================================================================
 # SCRIPT (2) Start the daemon
 # =============================================================================
+
+def clientThread( conn, addr ):
+    """
+        Single thread. Client commands:
+        1) START > Add new user ( nickname, IP, port )
+        2) Listen for user command untill
+        3) QUIT / Error > Close the thread
+    """
+
+    # Part 1:
+    user_conn = False
+    while not user_conn:
+        code, opt = recvClientMsg( conn )
+        if code == "START":
+            optList = opt.split( "|" )
+            if not len( optList ) == 3:
+                code, opt = setErr()
+            else:
+                nick, ip, port = opt.split( "|" )
+                # Overwrite with real IP and port
+                result = addUser( nick, addr[0], str(addr[1]) )
+                if result:
+                    user_conn = True
+                    opt = getHelp()
+                else:
+                    code, opt = setErr( f"Nickname or port already used!{NEW_LINE}" )
+        else:
+            code, opt = setErr()
+        sendClientMsg( conn, code, opt )
+
+    # Part 2
+    curr_port = addr[1]
+    while True:
+        code, opt = recvClientMsg( conn )
+
+        if code == "HELP":
+            sendClientMsg( conn, code, getHelp() )
+        elif code == "ALL":
+            sendClientMsg( conn, code, getUsers() )
+        elif code == "CHAT":
+            opt = getUser( "name", opt )
+            if not opt:
+                code, opt = setErr( "User not found! You can find all user with the !ALL command." )
+            sendClientMsg( conn, code, opt )
+        elif code == "QUIT" or code == False:
+            # Part 3: QUIT connection
+            userInfo = getUser( "port", curr_port )
+            nick, IP, port = userInfo.split("|")
+            print( f"Client connection down. IP: {IP}, port: {port}" )
+            removeUser( nick )
+            if code:
+                sendClientMsg( conn, code, opt )
+            conn.close()
+            break
+        else:
+            code, opt = setErr( "Command not found" )
+            sendClientMsg( conn, code, opt )            
 
 while True:
     conn, addr = socketSrv.accept()
