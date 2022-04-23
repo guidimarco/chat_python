@@ -48,7 +48,6 @@ def setChatInfo( info="", reset=False ):
         CHAT_NICK, CHAT_IP, CHAT_PORT = [ None, None, None ]
     else:
         CHAT_NICK, CHAT_IP, CHAT_PORT = info.split("|")
-
         print( f"{NEW_LINE}-----{NEW_LINE}" +
             f"New chat with {CHAT_NICK}" +
             f"{NEW_LINE}-----{NEW_LINE}" )
@@ -61,6 +60,7 @@ def recvServerMsg( serverSkt ):
     data = serverSkt.recv( 1024 )
     msg = data.decode()
 
+    # deserialize server msg
     msgList = msg.split( CODE_END )
     code = msgList[0][2:]
     opt = None if len( msgList ) == 1 else msgList[1]
@@ -68,13 +68,14 @@ def recvServerMsg( serverSkt ):
     return [ code, opt ]
 
 def sendServerMsg( skt, code, opt=None ):
+    # serialize msg for server
     reply = str( CODE_START + code + CODE_END + opt )
-    
     skt.sendall( reply.encode() )
 
 def deserializeUserMsg( msg ):
     code = False
-    if COMM_START in msg and msg.index( COMM_START ) == 0:
+    if ( COMM_START in msg 
+    and msg.index( COMM_START ) == 0 ):
         msgList = msg.split()
         code = msgList[0][1:]
         msg = "" if len( msgList ) == 1 else msgList[1]
@@ -82,7 +83,8 @@ def deserializeUserMsg( msg ):
         if code == "QUIT":
             msg = NICK
         elif code == "CHAT" and msg == NICK:
-            print( f"{PYCHAT + NICK_END} You cannot chat with yourself. Find another user with !ALL" )
+            print( f"{PYCHAT + NICK_END} You cannot chat with yourself." +
+                "Find another user with !ALL" )
             code = False
             msg = ""
         elif code == "END" and CHAT_NICK == None:
@@ -94,8 +96,8 @@ def deserializeUserMsg( msg ):
 
 def deserializeChatMsg( msg ):
     nick = False
-    if ( NICK_END in msg and
-        msg.index( NICK_END ) != 0 ):
+    if ( NICK_END in msg
+    and msg.index( NICK_END ) != 0 ):
         msgList = msg.split( NICK_END )
         nick = msgList[0]
         msg = msgList[1]
