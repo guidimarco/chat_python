@@ -149,7 +149,9 @@ def clientThread( conn, addr ):
             if not opt:
                 code, opt = setErr( "User not found! You can find all user with the !ALL command." )
         elif code == "QUIT":
-            removeUser( opt )
+            nick, IP, port = getUser( "name", opt ).split("|")
+            print( f"Client connection down. IP: {IP}, port: {port}" )
+            removeUser( nick )
             opt = "Connection closed!"
         else:
             code, opt = setErr( "Command not found" )
